@@ -1,7 +1,11 @@
-from flask import Flask, render_template, request
-from flask_socketio import SocketIO, join_room, emit
+import eventlet
+eventlet.monkey_patch()
+
+import os
 import random
 import string
+from flask import Flask, request
+from flask_socketio import SocketIO, join_room, emit
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "secret"
@@ -14,44 +18,12 @@ def generate_room_code():
 
 @app.route("/")
 def index():
-    return """
-    <h2>Create or Join Room</h2>
-    <button onclick="createRoom()">Create Room</button>
-    <input id="code" placeholder="Room Code">
-    <button onclick="joinRoom()">Join Room</button>
-
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script>
-        const socket = io();
-
-        function createRoom() {
-            socket.emit("create_room");
-        }
-
-        function joinRoom() {
-            const code = document.getElementById("code").value;
-            socket.emit("join_room", code);
-        }
-
-        socket.on("room_created", (code) => {
-            alert("Room created: " + code);
-        });
-
-        socket.on("room_joined", (msg) => {
-            alert(msg);
-        });
-
-        socket.on("error", (msg) => {
-            alert(msg);
-        });
-    </script>
-    """
+    return "Server is running"
 
 @socketio.on("create_room")
 def create_room():
     code = generate_room_code()
-    rooms[code] = []
-    rooms[code].append(request.sid)
+    rooms[code] = [request.sid]
     join_room(code)
     emit("room_created", code)
 
@@ -60,14 +32,14 @@ def join(code):
     if code not in rooms:
         emit("error", "Room not found")
         return
-
     if len(rooms[code]) >= 2:
         emit("error", "Room full")
         return
 
     rooms[code].append(request.sid)
     join_room(code)
-    emit("room_joined", "You joined the room", to=code)
+    emit("room_joined", "Player joined", to=code)
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, host="0.0.0.0", port=port)
